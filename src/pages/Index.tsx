@@ -59,11 +59,12 @@ const Index = () => {
               <Ball
                 faces={faces}
                 radius={0.3}
-                initialPosition={[0, 2.5, 0]}
+                initialPosition={[0, 0, 0]}
                 launched={launched}
                 launchVector={launchVector}
                 onHighlightFace={onHighlightFace}
                 resetCount={resetCount}
+                keyboardControl
               />
 
               {/* Soft ground plane for shadow catch */}

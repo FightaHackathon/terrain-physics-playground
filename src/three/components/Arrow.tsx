@@ -1,11 +1,11 @@
 import { useMemo } from 'react';
 import * as THREE from 'three';
-import { ThreeElements } from '@react-three/fiber';
+import { useFrame } from '@react-three/fiber';
 
 export type ArrowProps = {
   origin: THREE.Vector3 | [number, number, number];
   dir: THREE.Vector3 | [number, number, number];
-  length: number;
+  length?: number; // if omitted, uses |dir| dynamically
   color?: THREE.ColorRepresentation;
   headLength?: number;
   headWidth?: number;
@@ -17,21 +17,26 @@ export function Arrow({ origin, dir, length, color = 'white', headLength, headWi
     [origin]
   );
   const d = useMemo(
-    () => (dir instanceof THREE.Vector3 ? dir.clone().normalize() : new THREE.Vector3(...dir).normalize()),
+    () => (dir instanceof THREE.Vector3 ? dir : new THREE.Vector3(...dir)),
     [dir]
   );
 
-  const args: ThreeElements['primitive']['args'] = [d, o, Math.max(0.001, length), color, headLength, headWidth];
-  const arrow = useMemo(() => new THREE.ArrowHelper(...(args as ConstructorParameters<typeof THREE.ArrowHelper>)), [args[0], args[1], args[2], args[3]]);
+  // Create once
+  const arrow = useMemo(
+    () => new THREE.ArrowHelper(d.clone().normalize(), o, Math.max(0.001, length ?? d.length()), color),
+    []
+  );
 
-  // Update values when deps change
-  useMemo(() => {
+  // Continuously sync to provided vectors to support dynamic updates without re-renders
+  useFrame(() => {
     arrow.position.copy(o);
-    arrow.setDirection(d);
-    arrow.setLength(Math.max(0.001, length));
-    // @ts-ignore color optional
+    const nd = d.clone().normalize();
+    arrow.setDirection(nd);
+    const len = Math.max(0.001, length ?? d.length());
+    arrow.setLength(len, headLength, headWidth);
+    // @ts-ignore setColor exists on ArrowHelper in newer three versions
     arrow.setColor?.(new THREE.Color(color as any));
-  }, [arrow, o, d, length, color]);
+  });
 
   return <primitive object={arrow} />;
 }
