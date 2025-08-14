@@ -34,11 +34,12 @@ const Index = () => {
   const handleReset = () => {
     setLaunched(false);
     setResetCount((c) => c + 1);
+    setHighlightedFaceId(null);
   };
 
-  const onHighlightFace = (id: number) => {
+  const onHighlightFace = (id: number | null) => {
     setHighlightedFaceId(id);
-    setTimeout(() => setHighlightedFaceId(null), 500);
+    // Don't auto-clear highlighting - let it persist or clear when null
   };
 
   return (
@@ -50,9 +51,21 @@ const Index = () => {
 
       <main className="container grid lg:grid-cols-[1fr_320px] gap-6 pb-10">
         <section className="rounded-lg border bg-card">
-          <Canvas shadows camera={{ position: [6, 6, 8], fov: 50 }}>
-            <ambientLight intensity={0.5} />
-            <directionalLight castShadow position={[6, 10, 4]} intensity={0.9} />
+          <Canvas shadows camera={{ position: [8, 8, 8], fov: 50 }}>
+            <ambientLight intensity={0.6} />
+            <directionalLight 
+              castShadow 
+              position={[10, 12, 8]} 
+              intensity={1.0}
+              shadow-mapSize={[2048, 2048]}
+              shadow-camera-near={0.5}
+              shadow-camera-far={50}
+              shadow-camera-left={-10}
+              shadow-camera-right={10}
+              shadow-camera-top={10}
+              shadow-camera-bottom={-10}
+            />
+            <pointLight position={[-5, 8, 5]} intensity={0.3} color="#ffffff" />
 
             <group position={[0, 0, 0]}>
               <Terrain onFacesReady={setFaces} highlightedFaceId={highlightedFaceId} />
@@ -68,9 +81,9 @@ const Index = () => {
               />
 
               {/* Soft ground plane for shadow catch */}
-              <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]} receiveShadow>
-                <planeGeometry args={[40, 40]} />
-                <shadowMaterial opacity={0.15} />
+              <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -2, 0]} receiveShadow>
+                <planeGeometry args={[50, 50]} />
+                <shadowMaterial opacity={0.2} />
               </mesh>
             </group>
 

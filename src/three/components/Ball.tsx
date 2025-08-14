@@ -36,7 +36,7 @@ export function Ball({
   initialPosition?: [number, number, number];
   launched: boolean;
   launchVector: [number, number, number];
-  onHighlightFace?: (id: number) => void;
+  onHighlightFace?: (id: number | null) => void;
   resetCount: number;
   keyboardControl?: boolean;
 }) {
@@ -58,6 +58,8 @@ export function Ball({
     reflection: THREE.Vector3;
     until: number;
   }>(null);
+
+  const [currentFaceId, setCurrentFaceId] = useState<number | null>(null);
 
   const startPos = useMemo(() => new THREE.Vector3(...initialPosition), [initialPosition]);
 
@@ -100,7 +102,14 @@ export function Ball({
     projectionRef.current.set(0, 0, 0);
     reflectionRef.current.set(0, 0, 0);
     setImpact(null);
-  }, [resetCount, startPos, faces, radius]);
+    setCurrentFaceId(null);
+    
+    // Highlight initial face
+    if (g) {
+      setCurrentFaceId(g.id);
+      onHighlightFace?.(g.id);
+    }
+  }, [resetCount, startPos, faces, radius, onHighlightFace]);
 
   // Take snapshot of launch velocity when launched becomes true (legacy launch mode)
   const prevLaunched = useRef(false);
@@ -116,6 +125,22 @@ export function Ball({
   useFrame((_, dt) => {
     const delta = Math.min(dt, 1 / 60);
 
+    // Check for out-of-bounds (both modes)
+    const pos = meshRef.current.position;
+    const boundarySize = 6; // Half the terrain size
+    const fallThreshold = -5;
+    
+    if (pos.y < fallThreshold || Math.abs(pos.x) > boundarySize || Math.abs(pos.z) > boundarySize) {
+      // Reset ball to start position
+      const g = getGroundInfo(startPos.x, startPos.z, faces);
+      const y = g ? g.y + radius : startPos.y;
+      meshRef.current.position.set(startPos.x, y, startPos.z);
+      velocityRef.current.set(0, 0, 0);
+      setImpact(null);
+      setCurrentFaceId(null);
+      return;
+    }
+
     if (keyboardControl) {
       const speed = 3; // units/sec
       const input = new THREE.Vector3(
@@ -126,6 +151,12 @@ export function Ball({
 
       const g1 = getGroundInfo(meshRef.current.position.x, meshRef.current.position.z, faces);
       const n = (g1?.normal ?? new THREE.Vector3(0, 1, 0)).clone().normalize();
+
+      // Update current face highlighting
+      if (g1 && g1.id !== currentFaceId) {
+        setCurrentFaceId(g1.id);
+        onHighlightFace?.(g1.id);
+      }
 
       let v = new THREE.Vector3();
       if (input.lengthSq() > 0) v.copy(input).normalize().multiplyScalar(speed);
@@ -143,6 +174,12 @@ export function Ball({
         incomingRef.current.copy(v);
         projectionRef.current.copy(projectOnto(v, g2.normal));
         reflectionRef.current.copy(reflect(v, g2.normal));
+        
+        // Update current face highlighting
+        if (g2.id !== currentFaceId) {
+          setCurrentFaceId(g2.id);
+          onHighlightFace?.(g2.id);
+        }
       }
 
       return; // skip legacy physics below
@@ -150,6 +187,9 @@ export function Ball({
 
     // Legacy launch mode (kept for compatibility)
     if (!launched) return;
+
+    // Apply gravity
+    velocityRef.current.y -= 9.8 * delta;
 
     // Integrate
     meshRef.current.position.addScaledVector(velocityRef.current, delta);
@@ -215,7 +255,7 @@ export function Ball({
     <group>
       <mesh ref={meshRef} castShadow position={startPos.toArray()}>
         <sphereGeometry args={[radius, 32, 32]} />
-        <meshStandardMaterial color={'#60a5fa'} metalness={0.1} roughness={0.7} />
+        <meshLambertMaterial color={'#ef4444'} />
       </mesh>
 
       {showLaunchArrow && (
