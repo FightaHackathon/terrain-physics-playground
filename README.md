@@ -36,14 +36,3 @@ The tests verify:
 - Gravity affects only vertical velocity
 - Horizontal movement is preserved during gravity application
 
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/8ee807d2-4853-4379-8300-e55618d20f27) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
