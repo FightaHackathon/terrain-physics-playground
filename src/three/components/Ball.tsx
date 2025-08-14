@@ -125,21 +125,7 @@ export function Ball({
   useFrame((_, dt) => {
     const delta = Math.min(dt, 1 / 60);
 
-    // Check for out-of-bounds (both modes)
-    const pos = meshRef.current.position;
-    const boundarySize = 6; // Half the terrain size
-    const fallThreshold = -5;
-    
-    if (pos.y < fallThreshold || Math.abs(pos.x) > boundarySize || Math.abs(pos.z) > boundarySize) {
-      // Reset ball to start position
-      const g = getGroundInfo(startPos.x, startPos.z, faces);
-      const y = g ? g.y + radius : startPos.y;
-      meshRef.current.position.set(startPos.x, y, startPos.z);
-      velocityRef.current.set(0, 0, 0);
-      setImpact(null);
-      setCurrentFaceId(null);
-      return;
-    }
+    // No boundary checks - let ball move freely
 
     if (keyboardControl) {
       const speed = 3; // units/sec
