@@ -57,12 +57,43 @@ describe('Ball Physics', () => {
       expect(ball.position.x).not.toBe(0);
       expect(ball.position.z).not.toBe(0);
       
-      // Should be moving away from initial position
+      // Should be moving continuously away from initial position
       if (i > 0) {
-        expect(Math.abs(ball.position.x)).toBeGreaterThanOrEqual(Math.abs(initialX));
-        expect(Math.abs(ball.position.z)).toBeGreaterThanOrEqual(Math.abs(initialZ));
+        expect(ball.position.x).toBeGreaterThan(initialX);
+        expect(ball.position.z).toBeGreaterThan(initialZ);
       }
     }
+  });
+
+  test('continuous movement without position resets over long distances', () => {
+    ball.setVelocity(10, 5, -8); // High velocity movement
+    const positions: THREE.Vector3[] = [];
+    
+    // Simulate 60 frames (1 second at 60fps)
+    for (let i = 0; i < 60; i++) {
+      ball.update(deltaTime);
+      positions.push(ball.position.clone());
+      
+      // Position should never jump backwards or reset
+      if (i > 0) {
+        const prevPos = positions[i - 1];
+        const currPos = positions[i];
+        
+        // X and Z should continue moving in same direction
+        expect(currPos.x - prevPos.x).toBeGreaterThan(0);
+        expect(currPos.z - prevPos.z).toBeLessThan(0);
+        
+        // Position should never be exactly zero (indicating a reset)
+        expect(currPos.x).not.toBe(0);
+        expect(currPos.z).not.toBe(0);
+        expect(currPos.y).not.toBe(0);
+      }
+    }
+    
+    // Ball should have traveled significant distance
+    const finalPos = positions[positions.length - 1];
+    expect(Math.abs(finalPos.x)).toBeGreaterThan(5);
+    expect(Math.abs(finalPos.z)).toBeGreaterThan(5);
   });
 
   test('gravity affects velocity correctly', () => {

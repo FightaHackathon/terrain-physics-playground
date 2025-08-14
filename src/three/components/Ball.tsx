@@ -89,7 +89,7 @@ export function Ball({
     };
   }, [keyboardControl]);
 
-  // Reset ball
+  // Initialize ball position only on mount or explicit reset
   useEffect(() => {
     if (!meshRef.current) return;
     // Place on ground if available
@@ -109,7 +109,7 @@ export function Ball({
       setCurrentFaceId(g.id);
       onHighlightFace?.(g.id);
     }
-  }, [resetCount, startPos, faces, radius, onHighlightFace]);
+  }, [resetCount]); // Only reset on explicit resetCount change
 
   // Take snapshot of launch velocity when launched becomes true (legacy launch mode)
   const prevLaunched = useRef(false);
@@ -128,61 +128,59 @@ export function Ball({
     // No boundary checks - let ball move freely
 
     if (keyboardControl) {
-      const speed = 3; // units/sec
+      const speed = 5; // units/sec
+      const gravity = -9.81; // m/s²
+      
       const input = new THREE.Vector3(
         (keys.current['d'] ? 1 : 0) - (keys.current['a'] ? 1 : 0),
         0,
         (keys.current['w'] ? 1 : 0) - (keys.current['s'] ? 1 : 0)
       );
 
-      const g1 = getGroundInfo(meshRef.current.position.x, meshRef.current.position.z, faces);
-      const n = (g1?.normal ?? new THREE.Vector3(0, 1, 0)).clone().normalize();
-
-      // Update current face highlighting
-      if (g1 && g1.id !== currentFaceId) {
-        setCurrentFaceId(g1.id);
-        onHighlightFace?.(g1.id);
-      }
-
-      let v = new THREE.Vector3();
-      if (input.lengthSq() > 0) v.copy(input).normalize().multiplyScalar(speed);
-
-      // Move along the tangent of the ground plane
-      const vTangent = v.clone().sub(projectOnto(v, n));
-      meshRef.current.position.addScaledVector(vTangent, delta);
-
-      // Apply gravity if not on ground
-      if (!g1 || Math.abs(meshRef.current.position.y - (g1.y + radius)) > 0.1) {
-        velocityRef.current.y -= 9.8 * delta;
-        meshRef.current.position.addScaledVector(velocityRef.current, delta);
+      // Apply WASD input to horizontal velocity
+      if (input.lengthSq() > 0) {
+        input.normalize().multiplyScalar(speed);
+        velocityRef.current.x = input.x;
+        velocityRef.current.z = input.z;
       } else {
-        velocityRef.current.y = 0;
+        // Damping when no input
+        velocityRef.current.x *= 0.9;
+        velocityRef.current.z *= 0.9;
       }
 
-      // After moving, snap to ground if face is found
-      const g2 = getGroundInfo(meshRef.current.position.x, meshRef.current.position.z, faces);
-      if (g2) {
-        meshRef.current.position.y = g2.y + radius;
-        contactRef.current.set(meshRef.current.position.x, g2.y, meshRef.current.position.z);
-        normalRef.current.copy(g2.normal);
-        incomingRef.current.copy(v);
-        projectionRef.current.copy(projectOnto(v, g2.normal));
-        reflectionRef.current.copy(reflect(v, g2.normal));
+      // Always apply gravity
+      velocityRef.current.y += gravity * delta;
+
+      // Update position based on velocity
+      meshRef.current.position.addScaledVector(velocityRef.current, delta);
+
+      // Check for ground collision
+      const g = getGroundInfo(meshRef.current.position.x, meshRef.current.position.z, faces);
+      if (g && meshRef.current.position.y <= g.y + radius) {
+        // Collision with ground
+        meshRef.current.position.y = g.y + radius;
+        velocityRef.current.y = Math.max(0, velocityRef.current.y); // Stop downward movement
         
-        // Update current face highlighting
-        if (g2.id !== currentFaceId) {
-          setCurrentFaceId(g2.id);
-          onHighlightFace?.(g2.id);
+        // Update contact point and vectors for visualization
+        contactRef.current.set(meshRef.current.position.x, g.y, meshRef.current.position.z);
+        normalRef.current.copy(g.normal);
+        
+        const horizontalVel = new THREE.Vector3(velocityRef.current.x, 0, velocityRef.current.z);
+        incomingRef.current.copy(horizontalVel);
+        projectionRef.current.copy(projectOnto(horizontalVel, g.normal));
+        reflectionRef.current.copy(reflect(horizontalVel, g.normal));
+        
+        // Update face highlighting
+        if (g.id !== currentFaceId) {
+          setCurrentFaceId(g.id);
+          onHighlightFace?.(g.id);
         }
       } else {
-        // No ground found - clear face highlighting
+        // No ground collision - clear face highlighting
         if (currentFaceId !== null) {
           setCurrentFaceId(null);
           onHighlightFace?.(null);
         }
-        incomingRef.current.copy(v);
-        projectionRef.current.set(0, 0, 0);
-        reflectionRef.current.set(0, 0, 0);
       }
 
       return; // skip legacy physics below
@@ -256,7 +254,7 @@ export function Ball({
 
   return (
     <group>
-      <mesh ref={meshRef} castShadow position={startPos.toArray()}>
+      <mesh ref={meshRef} castShadow>
         <sphereGeometry args={[radius, 32, 32]} />
         <meshLambertMaterial color={'#ef4444'} />
       </mesh>
