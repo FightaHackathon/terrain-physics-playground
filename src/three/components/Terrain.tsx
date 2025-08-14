@@ -90,7 +90,7 @@ export function Terrain({
 
       {/* Face normals for teaching (blue like in the reference) */}
       {faces.map((f) => (
-        <Arrow key={`n-${f.id}`} origin={f.centroid} dir={f.normal} length={0.8} color="#3b82f6" />
+        <Arrow key={`n-${f.id}`} origin={f.centroid} dir={f.normal} length={0.3} color="#3b82f6" />
       ))}
     </group>
   );
