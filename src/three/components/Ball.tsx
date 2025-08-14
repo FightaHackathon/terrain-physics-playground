@@ -149,36 +149,52 @@ export function Ball({
         (keys.current['w'] ? 1 : 0) - (keys.current['s'] ? 1 : 0)
       );
 
-      // Move freely without terrain constraints
-      if (input.lengthSq() > 0) {
-        const movement = input.normalize().multiplyScalar(speed * delta);
-        meshRef.current.position.add(movement);
+      const g1 = getGroundInfo(meshRef.current.position.x, meshRef.current.position.z, faces);
+      const n = (g1?.normal ?? new THREE.Vector3(0, 1, 0)).clone().normalize();
+
+      // Update current face highlighting
+      if (g1 && g1.id !== currentFaceId) {
+        setCurrentFaceId(g1.id);
+        onHighlightFace?.(g1.id);
+      }
+
+      let v = new THREE.Vector3();
+      if (input.lengthSq() > 0) v.copy(input).normalize().multiplyScalar(speed);
+
+      // Move along the tangent of the ground plane
+      const vTangent = v.clone().sub(projectOnto(v, n));
+      meshRef.current.position.addScaledVector(vTangent, delta);
+
+      // Apply gravity if not on ground
+      if (!g1 || Math.abs(meshRef.current.position.y - (g1.y + radius)) > 0.1) {
+        velocityRef.current.y -= 9.8 * delta;
+        meshRef.current.position.addScaledVector(velocityRef.current, delta);
+      } else {
+        velocityRef.current.y = 0;
+      }
+
+      // After moving, snap to ground if face is found
+      const g2 = getGroundInfo(meshRef.current.position.x, meshRef.current.position.z, faces);
+      if (g2) {
+        meshRef.current.position.y = g2.y + radius;
+        contactRef.current.set(meshRef.current.position.x, g2.y, meshRef.current.position.z);
+        normalRef.current.copy(g2.normal);
+        incomingRef.current.copy(v);
+        projectionRef.current.copy(projectOnto(v, g2.normal));
+        reflectionRef.current.copy(reflect(v, g2.normal));
         
-        // Update vectors for display
-        incomingRef.current.copy(movement.multiplyScalar(1/delta)); // convert back to velocity
-        
-        // Check if we're near ground for vector calculations
-        const g = getGroundInfo(meshRef.current.position.x, meshRef.current.position.z, faces);
-        if (g && Math.abs(meshRef.current.position.y - (g.y + radius)) < 1) {
-          contactRef.current.set(meshRef.current.position.x, g.y, meshRef.current.position.z);
-          normalRef.current.copy(g.normal);
-          projectionRef.current.copy(projectOnto(incomingRef.current, g.normal));
-          reflectionRef.current.copy(reflect(incomingRef.current, g.normal));
-          
-          if (g.id !== currentFaceId) {
-            setCurrentFaceId(g.id);
-            onHighlightFace?.(g.id);
-          }
-        } else {
-          projectionRef.current.set(0, 0, 0);
-          reflectionRef.current.set(0, 0, 0);
-          if (currentFaceId !== null) {
-            setCurrentFaceId(null);
-            onHighlightFace?.(null);
-          }
+        // Update current face highlighting
+        if (g2.id !== currentFaceId) {
+          setCurrentFaceId(g2.id);
+          onHighlightFace?.(g2.id);
         }
       } else {
-        incomingRef.current.set(0, 0, 0);
+        // No ground found - clear face highlighting
+        if (currentFaceId !== null) {
+          setCurrentFaceId(null);
+          onHighlightFace?.(null);
+        }
+        incomingRef.current.copy(v);
         projectionRef.current.set(0, 0, 0);
         reflectionRef.current.set(0, 0, 0);
       }
