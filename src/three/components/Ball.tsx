@@ -165,8 +165,8 @@ export function Ball({
       const vTangent = v.clone().sub(projectOnto(v, n));
       meshRef.current.position.addScaledVector(vTangent, delta);
 
-      // After moving, snap to ground
-      const g2 = getGroundInfo(meshRef.current.position.x, meshRef.current.position.z, faces) ?? g1;
+      // After moving, snap to ground if face is found
+      const g2 = getGroundInfo(meshRef.current.position.x, meshRef.current.position.z, faces);
       if (g2) {
         meshRef.current.position.y = g2.y + radius;
         contactRef.current.set(meshRef.current.position.x, g2.y, meshRef.current.position.z);
@@ -180,6 +180,15 @@ export function Ball({
           setCurrentFaceId(g2.id);
           onHighlightFace?.(g2.id);
         }
+      } else {
+        // No ground found - ball is in free space, maintain current vectors but clear face highlighting
+        if (currentFaceId !== null) {
+          setCurrentFaceId(null);
+          onHighlightFace?.(null);
+        }
+        incomingRef.current.copy(v);
+        projectionRef.current.set(0, 0, 0);
+        reflectionRef.current.set(0, 0, 0);
       }
 
       return; // skip legacy physics below
